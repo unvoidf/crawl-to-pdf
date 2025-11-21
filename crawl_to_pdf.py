@@ -1,7 +1,9 @@
 """Bu dosya tüm crawler sürecini çalıştırır ve PDF çıktılarını yönetir."""
 import argparse
 import asyncio
+from datetime import datetime, timezone
 import os
+import shutil
 import sys
 import warnings
 from pathlib import Path
@@ -59,7 +61,8 @@ class CrawlToPDF:
     """Main orchestrator for crawling and PDF generation."""
     
     def __init__(self, start_url: str, output_dir: Optional[Path] = None, 
-                 workers: int = 5, delay: float = 0.5, debug: bool = False):
+                 workers: int = 5, delay: float = 0.5, debug: bool = False,
+                 if_exists: str = 'ask'):
         """Initialize crawler.
         
         Args:
@@ -68,12 +71,14 @@ class CrawlToPDF:
             workers: Number of parallel workers (default: 5)
             delay: Delay between requests in seconds (default: 0.5)
             debug: Enable debug logging (default: False)
+            if_exists: Behavior when output dir already exists
         """
         self.start_url = start_url
         self.url_manager = URLManager(start_url)
         self.workers = max(1, workers)  # At least 1 worker
         self.delay = max(0.0, delay)  # Non-negative delay
         self.debug = debug
+        self._if_exists = if_exists
         
         # Create output directory from domain if not provided
         if output_dir is None:
@@ -82,8 +87,48 @@ class CrawlToPDF:
             output_dir = Path('results') / folder_name
         
         self.output_dir = output_dir
-        self.file_name_generator = FileNameGenerator(output_dir)
+        mode = self._resolve_existing_output()
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.file_name_generator = FileNameGenerator(self.output_dir)
+        if mode == 'append':
+            self.file_name_generator.register_existing_files()
         self.progress_tracker = ProgressTracker()
+    
+    def _resolve_existing_output(self) -> str:
+        """Handle existing output directory and return selected mode."""
+        if not self.output_dir.exists():
+            return 'fresh'
+        
+        behavior = self._if_exists.lower()
+        if behavior == 'overwrite':
+            shutil.rmtree(self.output_dir)
+            return 'overwrite'
+        if behavior == 'append':
+            return 'append'
+        if behavior == 'abort':
+            print(f"\nOutput directory '{self.output_dir}' already exists. Aborting per configuration.\n")
+            sys.exit(0)
+        
+        # interactive prompt
+        prompt = (
+            f"\nOutput directory '{self.output_dir}' already exists.\n"
+            "Choose how to proceed:\n"
+            "  [O]verwrite existing files\n"
+            "  [A]ppend (keep existing files and add new ones)\n"
+            "  [Q]uit without changes\n"
+            "Selection [O/A/Q]: "
+        )
+        while True:
+            choice = input(prompt).strip().lower()
+            if choice in ('o', 'overwrite'):
+                shutil.rmtree(self.output_dir)
+                return 'overwrite'
+            if choice in ('a', 'append'):
+                return 'append'
+            if choice in ('q', 'quit', 'abort'):
+                print("\nExiting without running crawler.\n")
+                sys.exit(0)
+            print("Invalid selection. Please enter O, A, or Q.")
         
     async def _process_single_url(self, crawler: WebCrawler, pdf_generator: PDFGenerator, 
                                    url: str, worker_id: Optional[int] = None,
@@ -174,7 +219,10 @@ class CrawlToPDF:
                     return
             
             # Generate PDF
-            pdf_path = await pdf_generator.generate_pdf(page, title, url)
+            access_timestamp = datetime.now(timezone.utc).astimezone()
+            pdf_path, pdf_error = await pdf_generator.generate_pdf(
+                page, title, url, accessed_at=access_timestamp
+            )
             
             # Mark as processed only if PDF was successfully generated (thread-safe)
             if pdf_path:
@@ -209,7 +257,7 @@ class CrawlToPDF:
                 self.progress_tracker.finish_processing(
                     url, 
                     success=False, 
-                    error="Failed to generate PDF",
+                    error=pdf_error or "Failed to generate PDF",
                     worker_id=worker_id,
                     active_workers=active_workers
                 )
@@ -521,6 +569,13 @@ Examples:
             help='Enable debug logging'
         )
         
+        parser.add_argument(
+            '--if-exists',
+            choices=['ask', 'overwrite', 'append', 'abort'],
+            default='ask',
+            help="Behavior when output directory already exists (default: ask)"
+        )
+        
         args = parser.parse_args()
         
         # Validate arguments
@@ -530,7 +585,14 @@ Examples:
             parser.error("Delay must be non-negative")
         
         # Create crawler and run with proper exception handling
-        crawler = CrawlToPDF(args.url, args.output, workers=args.workers, delay=args.delay, debug=args.debug)
+        crawler = CrawlToPDF(
+            args.url,
+            args.output,
+            workers=args.workers,
+            delay=args.delay,
+            debug=args.debug,
+            if_exists=args.if_exists
+        )
         
         # Create event loop with custom exception handler
         loop = asyncio.new_event_loop()

@@ -19,6 +19,11 @@ class FileNameGenerator:
         self.output_dir = output_dir
         self.used_names: Set[str] = set()
         self.output_dir.mkdir(parents=True, exist_ok=True)
+    
+    def register_existing_files(self):
+        """Seed used names with existing PDF files in output directory."""
+        for existing_pdf in self.output_dir.glob('*.pdf'):
+            self.used_names.add(existing_pdf.stem)
         
     def _clean_title(self, title: str) -> str:
         """Clean and normalize title for file name.

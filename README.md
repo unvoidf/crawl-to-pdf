@@ -44,14 +44,26 @@ python crawl_to_pdf.py www.example.com --output my-pdfs
 
 # Kısa form
 python crawl_to_pdf.py example.com -o pdfs
+
+# Var olan sonuç klasörü için otomatik davranış
+python crawl_to_pdf.py example.com --if-exists overwrite
 ```
+
+`--if-exists` seçenekleri:
+
+- `ask` (varsayılan): Klasör zaten varsa seçim yapmanız istenir.
+- `overwrite`: Mevcut klasör silinir ve baştan oluşturulur.
+- `append`: Mevcut PDF'ler korunur, yenileri eklenir.
+- `abort`: Klasör varsa işlem başlatılmadan durur.
 
 ## Çıktı
 
 - PDF'ler varsayılan olarak `results/{domain}-pdfs` klasörüne kaydedilir
 - Örnek: `www.example.com` → `results/www-example-com-pdfs/` klasörü
 - PDF isimleri: `{Title}_{URL_segment}.pdf` formatındadır
+- Her PDF'nin üst bilgisinde sayfanın URL'si ve `Access Date: YYYY-MM-DD HH:MM:SS TZ` formatında erişim zamanı bulunur
 - Örnek: `Hakkimizda_about.pdf`
+- Aynı domain için klasör halihazırda varsa, program sizden seçim yapmanızı ister (`Overwrite / Append / Abort`). Otomasyon için `--if-exists` argümanı ile bu davranışı önceden belirleyebilirsiniz.
 
 ## Nasıl Çalışır?
 
