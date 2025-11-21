@@ -1,4 +1,4 @@
-"""Progress tracking and error logging for PDF crawling."""
+"""Bu dosya crawler sürecinin ilerlemesini ve hatalarını raporlar."""
 from typing import List, Optional
 import sys
 

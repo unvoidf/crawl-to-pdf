@@ -1,4 +1,4 @@
-"""URL management and domain filtering for web crawling."""
+"""Bu dosya URL kuyruğunu yönetir ve domain filtrelemeyi uygular."""
 from urllib.parse import urlparse, urljoin, urlunparse
 from collections import deque
 from typing import Set, Deque, Optional

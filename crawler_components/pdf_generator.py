@@ -1,9 +1,9 @@
-"""PDF generation from web pages using Playwright."""
+"""Bu dosya Playwright ile sayfaları PDF çıktısına dönüştürür."""
 import asyncio
 from pathlib import Path
 from playwright.async_api import Page
 from typing import Optional
-from file_name_generator import FileNameGenerator
+from .file_name_generator import FileNameGenerator
 
 
 class PDFGenerator:

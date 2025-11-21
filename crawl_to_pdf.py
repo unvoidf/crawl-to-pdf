@@ -1,4 +1,4 @@
-"""Main CLI script for crawling websites and converting pages to PDF."""
+"""Bu dosya tüm crawler sürecini çalıştırır ve PDF çıktılarını yönetir."""
 import argparse
 import asyncio
 import os
@@ -48,11 +48,11 @@ def _quiet_excepthook(exc_type, exc_value, exc_traceback):
 # Set custom exception hook
 sys.excepthook = _quiet_excepthook
 
-from url_manager import URLManager
-from web_crawler import WebCrawler
-from pdf_generator import PDFGenerator
-from file_name_generator import FileNameGenerator
-from progress_tracker import ProgressTracker
+from crawler_components.url_manager import URLManager
+from crawler_components.web_crawler import WebCrawler
+from crawler_components.pdf_generator import PDFGenerator
+from crawler_components.file_name_generator import FileNameGenerator
+from crawler_components.progress_tracker import ProgressTracker
 
 
 class CrawlToPDF:
@@ -79,7 +79,7 @@ class CrawlToPDF:
         if output_dir is None:
             domain = self.url_manager.base_domain
             folder_name = domain.replace('.', '-') + '-pdfs'
-            output_dir = Path(folder_name)
+            output_dir = Path('results') / folder_name
         
         self.output_dir = output_dir
         self.file_name_generator = FileNameGenerator(output_dir)

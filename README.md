@@ -48,8 +48,8 @@ python crawl_to_pdf.py example.com -o pdfs
 
 ## Çıktı
 
-- PDF'ler varsayılan olarak `{domain}-pdfs` klasörüne kaydedilir
-- Örnek: `www.example.com` → `www-example-com-pdfs/` klasörü
+- PDF'ler varsayılan olarak `results/{domain}-pdfs` klasörüne kaydedilir
+- Örnek: `www.example.com` → `results/www-example-com-pdfs/` klasörü
 - PDF isimleri: `{Title}_{URL_segment}.pdf` formatındadır
 - Örnek: `Hakkimizda_about.pdf`
 
@@ -99,11 +99,14 @@ python crawl_to_pdf.py example.com -o pdfs
 ```
 BBB/
 ├── crawl_to_pdf.py          # Ana CLI script
-├── url_manager.py           # URL yönetimi ve domain kontrolü
-├── web_crawler.py           # Web crawling mantığı
-├── pdf_generator.py         # PDF oluşturma
-├── file_name_generator.py   # PDF isimlendirme
-├── progress_tracker.py      # İlerleme takibi
+├── crawler_components/
+│   ├── __init__.py          # Yardımcı paket tanımı
+│   ├── url_manager.py       # URL yönetimi ve domain kontrolü
+│   ├── web_crawler.py       # Web crawling mantığı
+│   ├── pdf_generator.py     # PDF oluşturma
+│   ├── file_name_generator.py # PDF isimlendirme
+│   └── progress_tracker.py  # İlerleme takibi
+├── results/                 # PDF çıktıları (gitignore)
 ├── requirements.txt         # Bağımlılıklar
 └── README.md               # Bu dosya
 ```

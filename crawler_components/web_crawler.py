@@ -1,8 +1,8 @@
-"""Web crawling logic using Playwright."""
+"""Bu dosya Playwright ile sayfa yükleme ve link çıkarma işini yapar."""
 import asyncio
 from playwright.async_api import Browser, Page, TimeoutError as PlaywrightTimeoutError
 from typing import List, Optional
-from url_manager import URLManager
+from .url_manager import URLManager
 
 
 class WebCrawler:

@@ -1,4 +1,4 @@
-"""PDF file name generation from page titles and URLs."""
+"""Bu dosya başlıktan ve URL'den güvenli PDF dosya isimleri üretir."""
 import re
 import os
 from pathlib import Path
