@@ -77,7 +77,7 @@ class CrawlToPDF:
         
         # Create output directory from domain if not provided
         if output_dir is None:
-            domain = self.url_manager._extract_domain(start_url)
+            domain = self.url_manager.base_domain
             folder_name = domain.replace('.', '-') + '-pdfs'
             output_dir = Path(folder_name)
         
