@@ -87,10 +87,11 @@ class CrawlToPDF:
             output_dir = Path('results') / folder_name
         
         self.output_dir = output_dir
-        mode = self._resolve_existing_output()
+        self.output_dir = output_dir
+        self.exists_mode = self._resolve_existing_output()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.file_name_generator = FileNameGenerator(self.output_dir)
-        if mode == 'append':
+        if self.exists_mode == 'append':
             self.file_name_generator.register_existing_files()
         self.progress_tracker = ProgressTracker()
     
@@ -105,6 +106,10 @@ class CrawlToPDF:
             return 'overwrite'
         if behavior == 'append':
             return 'append'
+        if behavior == 'skip':
+            return 'skip'
+        if behavior == 'update':
+            return 'update'
         if behavior == 'abort':
             print(f"\nOutput directory '{self.output_dir}' already exists. Aborting per configuration.\n")
             sys.exit(0)
@@ -113,10 +118,12 @@ class CrawlToPDF:
         prompt = (
             f"\nOutput directory '{self.output_dir}' already exists.\n"
             "Choose how to proceed:\n"
-            "  [O]verwrite existing files\n"
-            "  [A]ppend (keep existing files and add new ones)\n"
-            "  [Q]uit without changes\n"
-            "Selection [O/A/Q]: "
+            "  [O]verwrite : Delete all existing files and start fresh\n"
+            "  [A]ppend    : Keep existing files, save new ones with numbered names (e.g., file_1.pdf)\n"
+            "  [S]kip      : Skip pages that already have a PDF file\n"
+            "  [U]pdate    : Overwrite existing PDFs only if website content has changed\n"
+            "  [Q]uit      : Exit without making changes\n"
+            "Selection [O/A/S/U/Q]: "
         )
         while True:
             choice = input(prompt).strip().lower()
@@ -125,6 +132,10 @@ class CrawlToPDF:
                 return 'overwrite'
             if choice in ('a', 'append'):
                 return 'append'
+            if choice in ('s', 'skip'):
+                return 'skip'
+            if choice in ('u', 'update'):
+                return 'update'
             if choice in ('q', 'quit', 'abort'):
                 print("\nExiting without running crawler.\n")
                 sys.exit(0)
@@ -220,12 +231,15 @@ class CrawlToPDF:
             
             # Generate PDF
             access_timestamp = datetime.now(timezone.utc).astimezone()
-            pdf_path, pdf_error = await pdf_generator.generate_pdf(
-                page, title, url, accessed_at=access_timestamp
+            
+            pdf_path, status, pdf_error = await pdf_generator.generate_pdf(
+                page, title, url, accessed_at=access_timestamp,
+                exists_mode=self.exists_mode
             )
             
             # Mark as processed only if PDF was successfully generated (thread-safe)
-            if pdf_path:
+            if pdf_path or status in ('skipped', 'unchanged'):
+                # Note: 'skipped' and 'unchanged' also count as processed for the URL manager
                 if processed_lock:
                     async with processed_lock:
                         # Double-check again before marking (another worker might have processed it)
@@ -234,17 +248,19 @@ class CrawlToPDF:
                         else:
                             if self.debug:
                                 print(f"[DEBUG] Worker-{worker_id} URL was processed by another worker, deleting duplicate PDF: {pdf_path}", file=sys.stderr)
-                            # Delete duplicate PDF
-                            try:
-                                pdf_path.unlink()
-                            except Exception:
-                                pass
+                            # Delete duplicate PDF if created
+                            if pdf_path and status == 'created':
+                                try:
+                                    pdf_path.unlink()
+                                except Exception:
+                                    pass
                             self.progress_tracker.finish_processing(
                                 url,
                                 success=False,
                                 error="Already processed by another worker",
                                 worker_id=worker_id,
-                                active_workers=active_workers
+                                active_workers=active_workers,
+                                status='failed'
                             )
                             return
                 else:
@@ -252,14 +268,16 @@ class CrawlToPDF:
                 
                 self.progress_tracker.finish_processing(url, success=True,
                                                        worker_id=worker_id,
-                                                       active_workers=active_workers)
+                                                       active_workers=active_workers,
+                                                       status=status)
             else:
                 self.progress_tracker.finish_processing(
                     url, 
                     success=False, 
                     error=pdf_error or "Failed to generate PDF",
                     worker_id=worker_id,
-                    active_workers=active_workers
+                    active_workers=active_workers,
+                    status='failed'
                 )
         
         except (asyncio.CancelledError, KeyboardInterrupt):
@@ -449,13 +467,13 @@ class CrawlToPDF:
         except (KeyboardInterrupt, asyncio.CancelledError):
             # Handle graceful shutdown
             print("\n\n" + "="*60, file=sys.stderr)
-            print("İşlem kullanıcı tarafından durduruldu.", file=sys.stderr)
+            print("Process stopped by user.", file=sys.stderr)
             print("="*60, file=sys.stderr)
             
             # Print partial summary
             if self.progress_tracker.get_processed_count() > 0:
-                print(f"\nTamamlanan sayfalar: {self.progress_tracker.get_processed_count()}", file=sys.stderr)
-                print(f"PDF'ler kaydedildi: {self.output_dir}", file=sys.stderr)
+                print(f"\nCompleted pages: {self.progress_tracker.get_processed_count()}", file=sys.stderr)
+                print(f"PDFs saved to: {self.output_dir}", file=sys.stderr)
             
             # Try to close browser gracefully
             if browser:
@@ -470,7 +488,7 @@ class CrawlToPDF:
         
         except Exception as e:
             # Handle other unexpected errors
-            print(f"\n\nHata oluştu: {str(e)}", file=sys.stderr)
+            print(f"\n\nError occurred: {str(e)}", file=sys.stderr)
             if browser:
                 try:
                     await browser.close()
@@ -571,7 +589,7 @@ Examples:
         
         parser.add_argument(
             '--if-exists',
-            choices=['ask', 'overwrite', 'append', 'abort'],
+            choices=['ask', 'overwrite', 'append', 'abort', 'skip', 'update'],
             default='ask',
             help="Behavior when output directory already exists (default: ask)"
         )
@@ -632,12 +650,12 @@ Examples:
     
     except KeyboardInterrupt:
         # This should be caught by crawl() method, but just in case
-        print("\n\nİşlem durduruldu.", file=sys.stderr)
+        print("\n\nProcess stopped.", file=sys.stderr)
         # Suppress threading cleanup exceptions by exiting immediately
         os._exit(0)
     
     except Exception as e:
-        print(f"\nBeklenmeyen hata: {str(e)}", file=sys.stderr)
+        print(f"\nUnexpected error: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 

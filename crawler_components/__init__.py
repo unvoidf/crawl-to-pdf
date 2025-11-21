@@ -1,2 +1,2 @@
-"""Bu klasör crawler yardımcı bileşenlerini paketler."""
+"""This folder packages crawler helper components."""
 

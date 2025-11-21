@@ -1,4 +1,4 @@
-"""Bu dosya URL kuyruğunu yönetir ve domain filtrelemeyi uygular."""
+"""This file manages URL queue and implements domain filtering."""
 from urllib.parse import urlparse, urljoin, urlunparse
 from collections import deque
 from typing import Set, Deque, Optional

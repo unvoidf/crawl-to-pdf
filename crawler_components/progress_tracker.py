@@ -1,4 +1,4 @@
-"""Bu dosya crawler sürecinin ilerlemesini ve hatalarını raporlar."""
+"""This file reports progress and errors of the crawler process."""
 from typing import List, Optional
 import sys
 
@@ -10,6 +10,9 @@ class ProgressTracker:
         """Initialize progress tracker."""
         self.processed_count = 0
         self.total_count = 0
+        self.created_count = 0
+        self.updated_count = 0
+        self.skipped_count = 0
         self.errors: List[str] = []
         
     def set_total(self, total: int):
@@ -43,7 +46,8 @@ class ProgressTracker:
         sys.stderr.flush()
     
     def finish_processing(self, url: str, success: bool = True, error: Optional[str] = None,
-                         worker_id: Optional[int] = None, active_workers: Optional[int] = None):
+                         worker_id: Optional[int] = None, active_workers: Optional[int] = None,
+                         status: str = 'created'):
         """Update progress when finishing processing a URL.
         
         Args:
@@ -52,6 +56,7 @@ class ProgressTracker:
             error: Error message if processing failed
             worker_id: Optional worker ID for parallel processing
             active_workers: Optional number of active workers
+            status: Processing status ('created', 'updated', 'skipped', 'unchanged', 'failed')
         """
         progress_str = self._format_progress()
         
@@ -63,7 +68,19 @@ class ProgressTracker:
             worker_info += f"(Active: {active_workers}) "
         
         if success:
-            print(f"{progress_str} {worker_info}Completed: {url}", file=sys.stderr)
+            if status == 'created':
+                self.created_count += 1
+                action = "Created"
+            elif status == 'updated':
+                self.updated_count += 1
+                action = "Updated"
+            elif status in ('skipped', 'unchanged'):
+                self.skipped_count += 1
+                action = "Skipped"
+            else:
+                action = "Completed"
+                
+            print(f"{progress_str} {worker_info}{action}: {url}", file=sys.stderr)
         else:
             error_msg = f"{progress_str} {worker_info}Failed: {url}"
             if error:
@@ -98,6 +115,9 @@ class ProgressTracker:
         print(f"\n{'='*60}", file=sys.stderr)
         print(f"Summary:", file=sys.stderr)
         print(f"  Processed: {self.processed_count} pages", file=sys.stderr)
+        print(f"  - Created: {self.created_count}", file=sys.stderr)
+        print(f"  - Updated: {self.updated_count}", file=sys.stderr)
+        print(f"  - Skipped: {self.skipped_count}", file=sys.stderr)
         if self.errors:
             print(f"  Errors: {len(self.errors)}", file=sys.stderr)
             print(f"\nErrors:", file=sys.stderr)

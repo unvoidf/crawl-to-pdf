@@ -1,9 +1,9 @@
-"""Bu dosya başlıktan ve URL'den güvenli PDF dosya isimleri üretir."""
+"""This file generates safe PDF file names from titles and URLs."""
 import re
 import os
 from pathlib import Path
 from urllib.parse import urlparse
-from typing import Set
+from typing import Set, Optional
 from unidecode import unidecode
 
 
@@ -137,6 +137,28 @@ class FileNameGenerator:
         self.used_names.add(final_name)
         return final_name
     
+    def get_base_name(self, title: str, url: str) -> str:
+        """Generate base PDF file name from title and URL without uniqueness check.
+        
+        Args:
+            title: Page title
+            url: Page URL
+            
+        Returns:
+            Base PDF file name (without .pdf extension)
+        """
+        clean_title = self._clean_title(title)
+        url_segment = self._get_url_segment(url)
+        clean_segment = self._clean_url_segment(url_segment)
+        
+        # Combine: title_segment
+        if clean_segment and clean_segment != 'index':
+            file_name = f"{clean_title}_{clean_segment}"
+        else:
+            file_name = clean_title
+            
+        return file_name
+    
     def get_full_path(self, file_name: str) -> Path:
         """Get full path for PDF file.
         
@@ -148,3 +170,49 @@ class FileNameGenerator:
         """
         return self.output_dir / f"{file_name}.pdf"
 
+    def get_hash_path(self, pdf_path: Path) -> Path:
+        """Get path for the hash file corresponding to a PDF.
+        
+        Args:
+            pdf_path: Path to the PDF file
+            
+        Returns:
+            Path to the .hash file in .hashes subdirectory
+        """
+        # Get the directory containing the PDF
+        pdf_dir = pdf_path.parent
+        # The hash file will be in .hashes subdirectory
+        hash_dir = pdf_dir / '.hashes'
+        # Return the full path to the hash file
+        return hash_dir / pdf_path.with_suffix('.hash').name
+
+    def get_latest_version(self, title: str, url: str) -> Optional[Path]:
+        """Find the latest version of a PDF for the given title and URL.
+        
+        Args:
+            title: Page title
+            url: Page URL
+            
+        Returns:
+            Path to the latest version (e.g., file_5.pdf) or None if no file exists.
+        """
+        base_name = self.get_base_name(title, url)
+        base_path = self.get_full_path(base_name)
+        
+        if not base_path.exists():
+            return None
+            
+        # Check for numbered versions
+        latest_path = base_path
+        counter = 1
+        
+        while True:
+            next_name = f"{base_name}_{counter}"
+            next_path = self.get_full_path(next_name)
+            if next_path.exists():
+                latest_path = next_path
+                counter += 1
+            else:
+                break
+                
+        return latest_path

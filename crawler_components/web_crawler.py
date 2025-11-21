@@ -1,4 +1,4 @@
-"""Bu dosya Playwright ile sayfa yükleme ve link çıkarma işini yapar."""
+"""This file handles page loading and link extraction using Playwright."""
 import asyncio
 from playwright.async_api import Browser, Page, TimeoutError as PlaywrightTimeoutError
 from typing import List, Optional

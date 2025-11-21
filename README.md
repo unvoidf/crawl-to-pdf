@@ -1,136 +1,163 @@
 # Website PDF Crawler
 
-Headless Chrome kullanarak bir website'deki tüm sayfaları crawl edip PDF formatına çeviren Python CLI aracı.
+Python CLI tool that crawls all pages of a website and converts them to PDF format using Headless Chrome.
 
-## Özellikler
+## Features
 
-- **Otomatik Crawling**: Verilen URL'den başlayarak domain içindeki tüm sayfaları otomatik keşfeder
-- **Domain Sınırlaması**: Sadece aynı domain içindeki sayfaları crawl eder
-- **PDF Dönüşümü**: Her sayfayı PDF formatına çevirir
-- **Akıllı İsimlendirme**: Sayfa başlığı ve URL'den otomatik dosya adı oluşturur
-- **Progress Tracking**: İşlem ilerlemesini gösterir
-- **Hata Yönetimi**: Hataları loglar ve işleme devam eder
+- **Automatic Crawling**: Automatically discovers all pages within a domain starting from a given URL
+- **Domain Restriction**: Only crawls pages within the same domain
+- **PDF Conversion**: Converts each page to PDF format
+- **Smart Naming**: Automatically generates file names from page title and URL
+- **Smart Append**: Doesn't create duplicate PDFs if content hasn't changed (hash-based verification)
+- **Parallel Processing**: Crawls pages in parallel using multiple workers
+- **Progress Tracking**: Shows processing progress
+- **Detailed Reporting**: Created/Updated/Skipped statistics
+- **Error Handling**: Logs errors and continues processing
 
-## Kurulum
+## Installation
 
-1. Gerekli bağımlılıkları yükleyin:
+1. Install required dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Playwright browser'ları yükleyin:
+2. Install Playwright browsers:
 
 ```bash
 playwright install chromium
 ```
 
-## Kullanım
+## Usage
 
-### Temel Kullanım
+### Basic Usage
 
 ```bash
 python crawl_to_pdf.py www.example.com
 ```
 
-### Örnekler
+### Examples
 
 ```bash
-# HTTPS ile
+# With HTTPS
 python crawl_to_pdf.py https://example.com
 
-# Özel çıktı klasörü ile
+# With custom output folder
 python crawl_to_pdf.py www.example.com --output my-pdfs
 
-# Kısa form
+# Short form
 python crawl_to_pdf.py example.com -o pdfs
 
-# Var olan sonuç klasörü için otomatik davranış
+# Automatic behavior for existing result folder
 python crawl_to_pdf.py example.com --if-exists overwrite
+
+# Parallel processing (4 workers)
+python crawl_to_pdf.py example.com --workers 4
+
+# Debug mode
+python crawl_to_pdf.py example.com --debug
 ```
 
-`--if-exists` seçenekleri:
+`--if-exists` options:
 
-- `ask` (varsayılan): Klasör zaten varsa seçim yapmanız istenir.
-- `overwrite`: Mevcut klasör silinir ve baştan oluşturulur.
-- `append`: Mevcut PDF'ler korunur, yenileri eklenir.
-- `abort`: Klasör varsa işlem başlatılmadan durur.
+- `ask` (default): Prompts you to choose if folder already exists.
+- `overwrite`: Deletes existing folder and starts fresh.
+- `append`: **Smart Append** - Keeps existing PDFs. Creates new version only if content has changed (hash-based verification).
+- `skip`: Skips pages that already have a PDF file.
+- `update`: Regenerates PDFs only if website content has changed.
+- `abort`: Stops without starting if folder exists.
 
-## Çıktı
+### Smart Append Feature
 
-- PDF'ler varsayılan olarak `results/{domain}-pdfs` klasörüne kaydedilir
-- Örnek: `www.example.com` → `results/www-example-com-pdfs/` klasörü
-- PDF isimleri: `{Title}_{URL_segment}.pdf` formatındadır
-- Her PDF'nin üst bilgisinde sayfanın URL'si ve `Access Date: YYYY-MM-DD HH:MM:SS TZ` formatında erişim zamanı bulunur
-- Örnek: `Hakkimizda_about.pdf`
-- Aynı domain için klasör halihazırda varsa, program sizden seçim yapmanızı ister (`Overwrite / Append / Abort`). Otomasyon için `--if-exists` argümanı ile bu davranışı önceden belirleyebilirsiniz.
+**Append** mode now works intelligently:
+- Content hash (SHA256) is calculated for each PDF and stored in `.hashes/` folder
+- If content hasn't changed in new crawl, duplicate PDF is not created
+- New numbered PDF is added only when content changes (e.g., `file_1.pdf`, `file_2.pdf`)
+- **Update** and **Skip** modes also use the same hash verification
 
-## Nasıl Çalışır?
+## Output
 
-1. Verilen URL'den başlar
-2. Domain'i çıkarır ve klasör oluşturur
-3. Headless Chrome'u başlatır
-4. BFS (Breadth-First Search) algoritması ile sayfaları crawl eder:
-   - Her sayfayı yükler (DOMContentLoaded)
-   - Sayfadaki linkleri çıkarır
-   - Aynı domain'deki yeni linkleri queue'ya ekler
-   - Sayfayı PDF'e çevirir
-5. Tüm sayfalar işlendiğinde özet gösterir
+- PDFs are saved to `results/{domain}-pdfs` folder by default
+- Example: `www.example.com` → `results/www-example-com-pdfs/` folder
+- PDF names: `{Title}_{URL_segment}.pdf` format
+- Each PDF header contains page URL and access time in `Access Date: YYYY-MM-DD HH:MM:SS TZ` format
+- Example: `About_us_about.pdf`
+- **Hash files**: Content hash for each PDF is stored in `.hashes/` subfolder (for Smart Append)
+- **Summary report**: Detailed statistics are shown at the end of processing:
+  ```
+  Summary:
+    Processed: X pages
+    - Created: Y
+    - Updated: Z
+    - Skipped: W
+    Errors: E
+  ```
 
-## Teknik Detaylar
+## How It Works
 
-### URL Normalizasyonu
-- Eksik protokol otomatik eklenir (https)
-- Fragment (#) kaldırılır
-- Query parametreleri korunur
-- Trailing slash normalize edilir
+1. Starts from given URL
+2. Extracts domain and creates folder
+3. Launches Headless Chrome
+4. Crawls pages using BFS (Breadth-First Search) algorithm:
+   - Loads each page (DOMContentLoaded)
+   - Extracts links from page
+   - Adds new links from same domain to queue
+   - Converts page to PDF
+5. Shows summary when all pages are processed
 
-### Domain Kontrolü
-- Sadece aynı domain'deki linkler takip edilir
-- Subdomain'ler dahil edilmez (www.example.com ≠ api.example.com)
+## Technical Details
 
-### PDF İsimlendirme
-- Sayfa başlığından ve URL'nin son segmentinden oluşturulur
-- Özel karakterler temizlenir
-- Türkçe karakterler ASCII'ye dönüştürülür
-- Duplicate isimler için sıra numarası eklenir
+### URL Normalization
+- Missing protocol is automatically added (https)
+- Fragment (#) is removed
+- Query parameters are preserved
+- Trailing slash is normalized
 
-### Hata Yönetimi
-- Sayfa yüklenemezse: loglanır, atlanır, devam edilir
-- PDF oluşturulamazsa: loglanır, atlanır, devam edilir
-- Tüm hatalar konsola ve özete yazılır
+### Domain Control
+- Only links from the same domain are followed
+- Subdomains are not included (www.example.com ≠ api.example.com)
 
-## Gereksinimler
+### PDF Naming
+- Generated from page title and last segment of URL
+- Special characters are cleaned
+- Turkish characters are converted to ASCII
+- Sequential numbers are added for duplicate names
+
+### Error Handling
+- If page cannot be loaded: logged, skipped, continues
+- If PDF cannot be created: logged, skipped, continues
+- All errors are written to console and summary
+
+## Requirements
 
 - Python 3.7+
 - Playwright
 - Unidecode
 
-## Dosya Yapısı
+## File Structure
 
 ```
 BBB/
-├── crawl_to_pdf.py          # Ana CLI script
+├── crawl_to_pdf.py          # Main CLI script
 ├── crawler_components/
-│   ├── __init__.py          # Yardımcı paket tanımı
-│   ├── url_manager.py       # URL yönetimi ve domain kontrolü
-│   ├── web_crawler.py       # Web crawling mantığı
-│   ├── pdf_generator.py     # PDF oluşturma
-│   ├── file_name_generator.py # PDF isimlendirme
-│   └── progress_tracker.py  # İlerleme takibi
-├── results/                 # PDF çıktıları (gitignore)
-├── requirements.txt         # Bağımlılıklar
-└── README.md               # Bu dosya
+│   ├── __init__.py          # Helper package definition
+│   ├── url_manager.py       # URL management and domain control
+│   ├── web_crawler.py       # Web crawling logic
+│   ├── pdf_generator.py     # PDF generation
+│   ├── file_name_generator.py # PDF naming
+│   └── progress_tracker.py  # Progress tracking
+├── results/                 # PDF outputs (gitignore)
+├── requirements.txt         # Dependencies
+└── README.md               # This file
 ```
 
-## Notlar
+## Notes
 
-- İlk çalıştırmada Playwright browser'ları indirilecektir (birkaç yüz MB)
-- Büyük website'ler için işlem uzun sürebilir
-- Rate limiting yoktur, dikkatli kullanın
-- Bazı sayfalar JavaScript ile dinamik içerik yükleyebilir, bu durumda içerik eksik olabilir
+- Playwright browsers will be downloaded on first run (a few hundred MB)
+- Processing may take a long time for large websites
+- No rate limiting, use carefully
+- Some pages may load dynamic content with JavaScript, content may be incomplete in such cases
 
-## Lisans
+## License
 
-Bu proje eğitim amaçlıdır.
-
+This project is for educational purposes.
